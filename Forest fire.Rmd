@@ -1,0 +1,334 @@
+---
+title: "ForestFirePredictionProject"
+author: "Ziming Yang"
+date: "12/9/2019"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r cars}
+library(corrplot)
+library(car)
+library(perturb)
+library(ggplot2)
+library(stargazer)
+```
+
+## Factor
+```{r pressure, echo=FALSE}
+forest <- read.csv("forestfires.csv")
+mat1 <- model.matrix(~factor(month),data=forest)
+
+# data.frame(forest$month, mat1)
+```
+
+# create a binary column for area, area with nonzero value is set to be 1, otherwise is 0.
+```{r}
+forest$area_binary <- ifelse(forest$area==0, 0, 1)
+forest$area_binary
+forest$area
+forest <- data.frame(forest)
+```
+
+# carete a new dataset with only observations of burned area greater than 0. Name this new dataset as forest_2
+```{r}
+forest_2 <- forest[forest$area>0,]
+forest_2$area
+nrow(forest_2)
+nrow(forest)
+nrow(forest[forest$area==0,])
+```
+
+# log transformation on some variables
+```{r}
+forest$log_rain <- log(forest$rain)
+forest$log_FFMC <- log(forest$FFMC)
+forest$log_ISI <- log(forest$ISI)
+forest_2$log_area <- log(forest_2$area)
+hist(forest_2$log_area)
+```
+
+## logistic regression
+```{r}
+
+```
+
+
+
+# plot histograms for variables in dataset forest
+```{r}
+
+
+
+hist(forest$DC)
+png(filename = "DC_hist.png", width = 3000, height = 3000, res = 300)
+par(cex = 1.3, mar = c(5, 4, 2, 1))
+hist(forest$DC,
+breaks = "FD",
+xlab = "DC",
+main = "")
+dev.off()
+
+
+hist(forest$log_ISI,col="gray")
+png(filename = "log_ISI_hist.png", width = 3000, height = 3000, res = 300)
+par(cex = 1.3, mar = c(5, 4, 2, 1))
+hist(forest$log_ISI,col="green",
+breaks = "FD",
+xlab = "log_ISI",
+main = "")
+dev.off()
+
+hist(forest_2$log_area,col="gray")
+png(filename = "log_area_hist.png", width = 3000, height = 3000, res = 300)
+par(cex = 1.3, mar = c(5, 4, 2, 1))
+hist(forest_2$log_area,col="gray",
+breaks = "FD",
+xlab = "log_area",
+main = "log(area)")
+dev.off()
+```
+
+
+
+Bar plot
+```{r}
+# binary
+png(filename = "binary_area.png", width = 3000, height = 3000, res = 300)
+#par(cex = 1.3, mar = c(5, 4, 2, 1))
+barplot(prop.table(table(forest$area_binary)), beside=TRUE, space=c(2, 3))
+dev.off()
+barplot(prop.table(table(forest$area_binary)))
+# month
+png(filename = "month_freq.png", width = 3000, height = 3000, res = 300)
+par(cex = 1.3, mar = c(5, 4, 2, 1))
+barplot(prop.table(table(forest$month)))
+dev.off()
+barplot(prop.table(table(forest$month)))
+# day
+png(filename = "day_freq.png", width = 3000, height = 3000, res = 300)
+par(cex = 1.3, mar = c(5, 4, 2, 1))
+barplot(prop.table(table(forest$day)))
+dev.off()
+barplot(prop.table(table(forest$day)))
+```
+
+# build model
+```{r}
+# model 1 linear regression with burned area greater than zero
+model_1 <- lm(log(area)~X+Y+factor(day)+FFMC+DMC+DC+ISI+temp+RH+wind+rain,data=forest_2)
+
+# stargazer(model_1, model_2,model_3, header=FALSE,type = "text")
+# plot fitted value
+## model 1
+plot(fitted(model_1))
+lines(lowess(fitted(model_1),rstudent(model_1)), col = "green", lwd = 4)
+png(filename = "model1_fitted.png", width = 3000, height = 3000, res = 300)
+par(cex = 1.5, mar = c(5, 4, 2, 1))
+plot(fitted(model_1), rstudent(model_1),
+     xlab = "Fitted Values",
+     ylab = "Studentized Residuals",
+     pch  = 19,
+     col  = rgb(0, 0, 0, .4))
+lines(lowess(fitted(model_1),rstudent(model_1)), col = "green",lwd = 4)
+dev.off()
+## mdoel 2
+model_2 <- lm(log(area)~X+Y+factor(day)+log(FFMC)+DMC+DC+ISI+temp+RH+wind+rain,data=forest_2)
+png(filename = "model2_fitted.png", width = 3000, height = 3000, res = 300)
+par(cex = 1.5, mar = c(5, 4, 2, 1))
+plot(fitted(model_2), rstudent(model_2),
+     xlab = "Fitted Values",
+     ylab = "Studentized Residuals",
+     pch  = 19,
+     col  = rgb(0, 0, 0, .4))
+lines(lowess(fitted(model_2),rstudent(model_2)), col = "green",lwd = 4)
+dev.off()
+## model 3
+
+model_3 <- lm(log(area)~X+Y+factor(day)+log(FFMC)+DMC+DC+log(ISI)+temp+RH+wind+rain,data=forest_2)
+plot(fitted(model_3))
+png(filename = "model3_fitted.png", width = 3000, height = 3000, res = 300)
+par(cex = 1.5, mar = c(5, 4, 2, 1))
+plot(fitted(model_3), rstudent(model_3),
+     xlab = "Fitted Values",
+     ylab = "Studentized Residuals",
+     pch  = 19,
+     col  = rgb(0, 0, 0, .4))
+lines(lowess(fitted(model_3),rstudent(model_3)), col = "green",lwd = 4)
+dev.off()
+```
+```{r}
+round(summary(model_3)$coefficients,3)
+plot_coeffs <- function(mlr_model) {
+  coeffs <- coefficients(mlr_model)
+  mp <- barplot(coeffs, col="grey", xaxt='n', main="Regression Coefficients")##3F97D0
+  lablist <- names(coeffs)
+  text(mp, par("usr")[3], labels = lablist, srt = 45, adj = c(1.1,1.1), xpd = TRUE, cex=0.6)
+}
+plot_coeffs(model_3)
+```
+
+
+## fitted value
+```{r}
+plot(fitted(model_1), rstudent(model_1))
+png(filename = "fitted.png", width = 3000, height = 3000, res = 300)
+par(cex = 1.5, mar = c(5, 4, 2, 1))
+plot(fitted(model_1), rstudent(model_1),
+xlab = "Fitted Values",
+ylab = "Studentized Residuals",
+ylim = c(-4, 4),
+xlim = c(20000, 160000),
+pch = 19,
+col = rgb(0, 0, 0, .4))
+lines(lowess(fitted(model_1),rstudent(model_1)), col = "green", lwd = 4)
+```
+
+# GAM
+```{r}
+library(mgcv)
+# model 4
+model_4 <- gam(log(area)~s(X,k=6)+Y+factor(month)+factor(day)+log(FFMC)+DMC+DC+ISI+temp+RH+wind+rain,data=forest_2)
+png(filename = "model4_gam.png", width = 3000, height = 3000, res = 300)
+par(cex = 1.5, mar = c(5, 4, 2, 1))
+plot(model_4, 
+     residuals = TRUE, 
+     shade    = TRUE,
+     pch = 19,
+     col = rgb(0, 0, 0, .4),
+     cex = .5)
+dev.off()
+
+forest_2$X_plus_Y <- forest_2$X + forest_2$Y
+# model 5
+model_5 <- gam(log(area)~s(X_plus_Y,k=6)+factor(month)+factor(day)+log(FFMC)+DMC+DC+ISI+temp+RH+wind+rain,data=forest_2)
+png(filename = "model5_gam.png", width = 3000, height = 3000, res = 300)
+par(cex = 1.5, mar = c(5, 4, 2, 1))
+plot(model_5, 
+     residuals = TRUE, 
+     shade    = TRUE,
+     pch = 19,
+     col = rgb(0, 0, 0, .4),
+     cex = .5)
+dev.off()
+
+```
+# cross validation
+```{r}
+# generate empty prediction and outcome vectors
+predictions1 <- c()
+predictions2 <- c()
+predictions3 <- c()
+predictions4 <- c()
+predictions5 <- c()
+
+
+# logistic regression CV function
+CV <- function(data1 = forest_2, k = 5){
+  # select number of folds
+  folds <- k
+  # generate fold sequence
+  fold.num <- rep(1:folds, length.out = nrow(data1))
+  # randomize fold sequence
+  fold.samp <- sample(fold.num)
+  for(i in 1:k){
+    
+    # Training data 
+    train <- data1[fold.samp != i, ]
+    # Test data takes the remaining rows
+    test <- data1[fold.samp == i, ]
+    
+    # Run lm on training data
+    model_1 <- lm(log(area)~X+Y+day+FFMC+DMC+DC+ISI+temp+RH+wind+rain,data=train)
+    model_2 <- lm(log(area)~X+Y+day+log(FFMC)+DMC+DC+ISI+temp+RH+wind+rain,data=train)
+    model_3 <- lm(log(area)~X+Y+day+log(FFMC)+DMC+DC+log(ISI)+temp+RH+wind+rain,data=train)
+    model_4 <- gam(log(area)~s(X,k=5)+s(Y,k=5)+day+log(FFMC)+DMC+DC+ISI+temp+RH+wind+rain,data=train)
+    model_5 <- gam(log(area)~s(X_plus_Y,k=5)+day+log(FFMC)+DMC+DC+ISI+temp+RH+wind+rain,data=train)
+    
+    # Test error
+    model_1.test <- (log(test$area) - predict(model_1,  test, type="response"))^2
+    model_2.test <- (log(test$area) - predict(model_2,  test, type="response"))^2
+    model_3.test <- (log(test$area) - predict(model_3,  test, type="response"))^2
+    model_4.test <- (log(test$area) - predict(model_4,  test, type="response"))^2
+    model_5.test <- (log(test$area) - predict(model_5, test, type="response"))^2
+
+    # Store results
+    options(warn=-1)
+    predictions1 <- append(predictions1, model_1.test)
+    predictions2 <- append(predictions2, model_2.test)
+    predictions3 <- append(predictions3, model_3.test)
+    predictions4 <- append(predictions4, model_4.test)
+    predictions5 <- append(predictions5, model_5.test)
+
+
+    # Test rmse
+    model_1.rMSE <- sqrt(sum(predictions1)/(length(predictions1)))
+    model_2.rMSE <- sqrt(sum(predictions2)/(length(predictions2)))
+    model_3.rMSE <- sqrt(sum(predictions3)/(length(predictions3)))
+    model_4.rMSE <- sqrt(sum(predictions4)/(length(predictions4)))
+    model_5.rMSE <- sqrt(sum(predictions5)/(length(predictions5)))
+    }
+    return(list(model_1.rMSE, model_2.rMSE, model_3.rMSE,model_4.rMSE,model_5.rMSE))
+}
+
+# Replicate the 5-fold cross-validation 100 times
+cvs <- replicate(100, CV())
+
+# Pull out the average rMSE for each model
+model_1.cv <- mean(sapply(cvs[1, ], mean))
+model_2.cv <- mean(sapply(cvs[2, ], mean))
+model_3.cv<- mean(sapply(cvs[3, ], mean))
+model_4.cv<- mean(sapply(cvs[4, ], mean))
+model_5.cv<- mean(sapply(cvs[5, ], mean))
+res <- c(model_1.cv,model_2.cv,model_3.cv,model_4.cv,model_5.cv)
+res
+```
+
+# logistic regression
+```{r}
+model_6 <- glm(area_binary ~ X+Y+day+log(FFMC)+DMC+DC+log(ISI+1)++temp+RH+wind+rain,
+data = forest, family = binomial(link = "logit"))
+```
+
+```{r}
+round(summary(model_6)$coefficients,3)
+plot_coeffs <- function(mlr_model) {
+  coeffs <- coefficients(mlr_model)
+  mp <- barplot(coeffs, col="grey", xaxt='n', main="Regression Coefficients")##3F97D0
+  lablist <- names(coeffs)
+  text(mp, par("usr")[3], labels = lablist, srt = 45, adj = c(1.1,1.1), xpd = TRUE, cex=0.6)
+}
+plot_coeffs(model_6)
+```
+
+```{r}
+newdata
+```
+
+```{r}
+Wed <- subset(forest, day =="wed")
+Tue <- subset(forest, day =="tue")
+Sat <- subset(forest, day =="sat")
+Sun <- subset(forest, day =="sun")
+Fri <- subset(forest, day =="fri")
+png(filename = "wed.png", width = 3000, height = 3000, res = 300)
+barplot(prop.table(table(Wed$area_binary)), beside=TRUE, space=c(2, 3),main="Wednesday")
+dev.off()
+png(filename = "tue.png", width = 3000, height = 3000, res = 300)
+barplot(prop.table(table(Tue$area_binary)), beside=TRUE, space=c(2, 3),main="Tuesday")
+dev.off()
+png(filename = "sat.png", width = 3000, height = 3000, res = 300)
+barplot(prop.table(table(Sat$area_binary)), beside=TRUE, space=c(2, 3),main="Saturday")
+dev.off()
+png(filename = "sun.png", width = 3000, height = 3000, res = 300)
+barplot(prop.table(table(Sun$area_binary)), beside=TRUE, space=c(2, 3),main="Sunday")
+dev.off()
+barplot(prop.table(table(Fri$area_binary)), beside=TRUE, space=c(2, 3),main="Sunday")
+
+```
+
+```{r}
+barplot(prop.table(table(Fri$area_binary)), beside=TRUE, space=c(2, 3),main="Sunday")
+```
+
